@@ -2,140 +2,114 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
-st.set_page_config(page_title="GanadoPro Chile - Análisis de Viabilidad", page_icon="📈")
+# 1. CONFIGURACIÓN DE PÁGINA (Mantiene layout ancho)
+st.set_page_config(page_title="GanadoPro Chile - Gestión Total", page_icon="📈", layout="wide")
 
-st.title("🐄 Simulador de Viabilidad Ganadera (CLP)")
+st.title("🐄 Simulador de Viabilidad, Carga y Gestión (CLP)")
 
-# --- BASE DE DATOS DE RAZAS Y GENÉTICA ---
+# 2. BASE DE DATOS DE RAZAS (Mantiene las 25 razas)
 RAZAS = {
-    # --- CARNICERAS EUROPEAS (Alta eficiencia) ---
-    "Aberdeen Angus": 1.10, 
-    "Hereford": 1.05, 
-    "Charolais": 1.15, 
-    "Limousin": 1.12, 
-    "Shorthorn": 1.02,
-    "Blonda de Aquitania": 1.14,
-    "Rubia Gallega": 1.08,
-    "Wagyu (Kobe)": 0.95,
-
-    # --- DOBLE PROPÓSITO ---
-    "Simmental": 1.08, 
-    "Normando": 0.98,
-    "Parda Suiza (Braunvieh)": 1.00,
-    "Fleckvieh": 1.07,
-
-    # --- CEBUINAS (Resistentes al calor) ---
-    "Brahman": 0.90, 
-    "Nelore": 0.88, 
-    "Guzerat": 0.89,
-    "Gyr": 0.82,
-    "Indubrasil": 0.87,
-
-    # --- SINTÉTICAS (Cruzas) ---
-    "Brangus": 1.02, 
-    "Braford": 1.00, 
-    "Santa Gertrudis": 0.97,
-    "Beefmaster": 1.01,
-    "Girolando": 0.85,
-
-    # --- LECHERAS (Baja ganancia de carne) ---
-    "Holstein": 0.75, 
-    "Jersey": 0.65,
-    "Ayrshire": 0.72
+    "Aberdeen Angus": 1.10, "Hereford": 1.05, "Charolais": 1.15, "Limousin": 1.12, 
+    "Shorthorn": 1.02, "Blonda de Aquitania": 1.14, "Rubia Gallega": 1.08, "Wagyu (Kobe)": 0.95,
+    "Simmental": 1.08, "Normando": 0.98, "Parda Suiza": 1.00, "Fleckvieh": 1.07,
+    "Brahman": 0.90, "Nelore": 0.88, "Guzerat": 0.89, "Gyr": 0.82, "Indubrasil": 0.87,
+    "Brangus": 1.02, "Braford": 1.00, "Santa Gertrudis": 0.97, "Beefmaster": 1.01,
+    "Girolando": 0.85, "Holstein": 0.75, "Jersey": 0.65, "Ayrshire": 0.72
 }
 
-# --- SIDEBAR: DATOS DEL CAMPO Y COSTOS (EN CLP) ---
-st.sidebar.header("💰 Costos del Campo (CLP)")
-# Ajustado a un valor promedio de talaje/manejo en Chile
-costo_fijo_dia = st.sidebar.number_input("Costo operativo diario por animal ($ CLP)", value=600, help="Incluye personal, agua, mantenimiento.")
-# Ajustado a costo de vacunas y desparasitación promedio
-costo_sanidad = st.sidebar.number_input("Gasto en vacunas/medicina por animal ($ CLP)", value=18000)
+# 3. SIDEBAR: DATOS DEL CAMPO (Nuevas funciones de exactitud y alimento)
+st.sidebar.header("💰 Datos del Campo y Alimento")
+
+alimento_ha = st.sidebar.number_input("Alimento generado (kg MS/ha/año)", value=5000, help="Producción total de materia seca por hectárea.")
+superficie = st.sidebar.number_input("Superficie del potrero (Hectáreas)", value=1.0, min_value=0.1)
 
 tipo_pasto = st.sidebar.selectbox(
-    "Calidad del Pasto", 
-    ["Pobre (Natural)", "Media (Mejorado)", "Excelente (Pastura)"]
+    "Calidad y Tipo de Pastura", 
+    [
+        "Pradera Natural Degradada (Baja)", 
+        "Pradera Natural Mejorada (Media)", 
+        "Pastura Sembrada (Ballica/Trébol)", 
+        "Alfalfa o Forraje de Corte", 
+        "Suplementación Total (Feedlot)"
+    ]
 )
-gdp_base = {"Pobre (Natural)": 0.35, "Media (Mejorado)": 0.65, "Excelente (Pastura)": 0.95}
 
-# --- DATOS DEL ANIMAL ---
-col1, col2 = st.columns(2)
-with col1:
+# Coeficientes GDP exactos
+gdp_base = {
+    "Pradera Natural Degradada (Baja)": 0.30, 
+    "Pradera Natural Mejorada (Media)": 0.55, 
+    "Pastura Sembrada (Ballica/Trébol)": 0.85, 
+    "Alfalfa o Forraje de Corte": 1.05, 
+    "Suplementación Total (Feedlot)": 1.30
+}
+
+costo_fijo_dia = st.sidebar.number_input("Costo operativo diario por animal ($ CLP)", value=600)
+costo_sanidad = st.sidebar.number_input("Gasto en vacunas/medicina por animal ($ CLP)", value=18000)
+
+# 4. ENTRADA DE DATOS DEL ANIMAL
+col_a, col_b = st.columns(2)
+with col_a:
     raza = st.selectbox("Raza", list(RAZAS.keys()))
     peso_ini = st.number_input("Peso Inicial (kg)", value=220.0)
-with col2:
-    # Precio de compra por kilo vivo promedio en ferias chilenas
+    num_animales_usuario = st.number_input("Cantidad de animales que deseas meter", value=1, min_value=1)
+with col_b:
     precio_compra = st.number_input("Precio Compra ($ CLP/kg)", value=1900)
     dias = st.slider("Días de estadía", 30, 365, 120)
+    precio_venta_proy = st.number_input("Precio Venta Proyectado ($ CLP/kg)", value=2150)
 
-# --- CÁLCULOS CRÍTICOS ---
-# 1. Crecimiento
+# 5. CÁLCULOS TÉCNICOS
+# Crecimiento
 gdp_final = gdp_base[tipo_pasto] * RAZAS[raza]
 peso_fin = peso_ini + (gdp_final * dias)
 
-# 2. Finanzas (Inversión vs Venta)
-inversion_animal = peso_ini * precio_compra
-costos_operativos = (costo_fijo_dia * dias) + costo_sanidad
-total_invertido = inversion_animal + costos_operativos
+# Capacidad de Carga (Consumo 3% peso vivo y 70% eficiencia)
+peso_promedio = (peso_ini + peso_fin) / 2
+consumo_diario_ms = peso_promedio * 0.03
+consumo_total_periodo_animal = consumo_diario_ms * dias
+alimento_disponible_real = (alimento_ha * superficie) * 0.70
+capacidad_max = int(alimento_disponible_real / consumo_total_periodo_animal) if consumo_total_periodo_animal > 0 else 0
 
-# Proyectamos precio de venta (estimado conservador para Chile)
-precio_venta_proyectado = precio_compra * 1.12 
-ingreso_total = peso_fin * precio_venta_proyectado
-utilidad_neta = ingreso_total - total_invertido
-margen_porcentaje = (utilidad_neta / total_invertido) * 100 if total_invertido > 0 else 0
+# Finanzas
+inversion_unidad = (peso_ini * precio_compra) + (costo_fijo_dia * dias) + costo_sanidad
+ingreso_unidad = peso_fin * precio_venta_proy
+utilidad_unidad = ingreso_unidad - inversion_unidad
+roi = (utilidad_unidad / inversion_unidad) * 100 if inversion_animal > 0 else 0
 
-# --- RESULTADOS Y VEREDICTO ---
+# 6. RESULTADOS VISUALES
 st.divider()
-st.header("📊 Análisis de Rentabilidad")
+st.header("📊 Resultado de la Proyección")
 
-# Métricas principales con formato de separador de miles para CLP
-m1, m2, m3 = st.columns(3)
-m1.metric("Peso Final Est.", f"{peso_fin:.1f} kg")
-m2.metric("Inversión Total", f"${total_invertido:,.0f} CLP")
-m3.metric("Ganancia Neta", f"${utilidad_neta:,.0f} CLP", f"{margen_porcentaje:.1f}% ROI")
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Peso Final", f"{peso_fin:.1f} kg", f"+{peso_fin-peso_ini:.1f} kg")
+c2.metric("Capacidad Máxima", f"{capacidad_max} Cabezas", help="Animales que tu pasto puede soportar.")
+c3.metric("Utilidad/Animal", f"${utilidad_unidad:,.0f} CLP", f"{roi:.1f}% ROI")
+c4.metric("Utilidad Total Lote", f"${(utilidad_unidad * num_animales_usuario):,.0f} CLP")
 
-# --- EL SEMÁFORO DE VIABILIDAD ---
-if utilidad_neta > (total_invertido * 0.15): # Si ganas más del 15%
-    st.success(f"✅ **PROYECTO VIABLE:** La rentabilidad es alta. Con {raza} en este pasto, el negocio es sólido.")
+# 7. ALERTAS Y SEMÁFORO (Incluye Alerta de Sobrepastoreo)
+if num_animales_usuario > capacidad_max and capacidad_max > 0:
+    st.error(f"⚠️ **ALERTA DE SOBREPASTOREO:** Estás intentando meter {num_animales_usuario} animales, pero tu campo solo soporta {capacidad_max} para este periodo. El ganado perderá peso por falta de comida.")
+elif utilidad_unidad > (inversion_unidad * 0.15):
+    st.success(f"✅ **PROYECTO VIABLE:** Gran margen de utilidad y carga animal equilibrada.")
     st.balloons()
-elif utilidad_neta > 0: # Si ganas pero muy poco
-    st.warning(f"⚠️ **RIESGO MODERADO:** Hay ganancia, pero el margen es bajo ({margen_porcentaje:.1f}%). Un aumento en el precio del forraje o baja en la feria podría darte pérdidas.")
-else: # Si pierdes dinero
-    st.error(f"❌ **PROYECTO NO VIABLE:** Estás perdiendo ${abs(utilidad_neta):,.0f} CLP por animal. Los costos operativos superan el crecimiento del peso.")
+elif utilidad_neta > 0:
+    st.warning("⚠️ **RIESGO MODERADO:** Hay ganancia, pero revisa la carga o los costos operativos.")
+else:
+    st.error("❌ **PÉRDIDA ECONÓMICA:** Los costos superan el crecimiento proyectado.")
 
-# --- FUNCIÓN DE DESCARGA EXCEL ---
-st.subheader("📥 Descargar Reporte")
-
-# Crear tabla de datos para el Excel
-df_reporte = pd.DataFrame({
-    "Descripción": [
-        "Raza seleccionada", "Pasto", "Días de estadía", "Peso inicial", 
-        "Peso final estimado", "Ganancia de peso diaria", "Precio compra p/kg", 
-        "Costo operativo total", "Inversión total", "Ingreso venta estimado", 
-        "Utilidad Neta", "Rentabilidad (ROI)"
-    ],
-    "Valor": [
-        raza, tipo_pasto, dias, f"{peso_ini} kg", 
-        f"{peso_fin:.1f} kg", f"{gdp_final:.2f} kg/día", f"${precio_compra} CLP",
-        f"${costos_operativos:,.0f} CLP", f"${total_invertido:,.0f} CLP", f"${ingreso_total:,.0f} CLP",
-        f"${utilidad_neta:,.0f} CLP", f"{margen_porcentaje:.1f}%"
-    ]
-})
-
+# 8. EXPORTACIÓN A EXCEL (Mantiene la función)
 def to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='Reporte')
     return output.getvalue()
 
-excel_data = to_excel(df_reporte)
+df_reporte = pd.DataFrame({
+    "Variable": ["Raza", "Tipo Pasto", "Capacidad Campo", "Animales a ingresar", "Utilidad/Animal", "Utilidad Total"],
+    "Valor": [raza, tipo_pasto, capacidad_max, num_animales_usuario, f"${utilidad_unidad:,.0f}", f"${(utilidad_unidad * num_animales_usuario):,.0f}"]
+})
 
-st.download_button(
-    label="📊 Descargar Informe en Excel",
-    data=excel_data,
-    file_name=f"Informe_{raza}_{dias}dias.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+st.download_button("📥 Descargar Reporte Excel", data=to_excel(df_reporte), file_name=f"Reporte_{raza}.xlsx")
 
-# Gráfico de Punto de Equilibrio
-st.write("### Crecimiento Proyectado")
-st.line_chart({"Días": [0, dias], "Peso (kg)": [peso_ini, peso_fin]}, x="Días", y="Peso (kg)")
+# 9. GRÁFICO DE CRECIMIENTO
+st.write("### Proyección de Peso")
+st.line_chart({"Peso (kg)": [peso_ini, peso_fin]})
