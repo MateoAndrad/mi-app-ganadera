@@ -5,7 +5,7 @@ from io import BytesIO
 # 1. CONFIGURACIÓN DE PÁGINA (Debe ser la primera instrucción de Streamlit)
 st.set_page_config(
     page_title="GanadoPro Chile - Gestión Total", 
-    page_icon="📈", 
+    page_icon="logo.png", # <--- Aquí es donde cambias el ícono de la pestaña
     layout="wide"
 )
 
@@ -111,3 +111,4 @@ st.download_button("📥 Descargar Reporte Excel", data=to_excel(df_reporte), fi
 
 # 11. GRÁFICO
 st.line_chart({"Peso (kg)": [peso_ini, peso_fin]})
+
