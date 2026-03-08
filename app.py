@@ -44,6 +44,10 @@ st.markdown("""
         border-radius: 20px;
         box-shadow: 0 10px 25px rgba(0,0,0,0.05);
         margin-bottom: 30px;
+        color: #1f2937 !important; /* Color oscuro para las letras */
+    }
+    .welcome-text h1, .welcome-text h3, .welcome-text p {
+        color: #1f2937 !important; /* Asegura que títulos y párrafos se vean */
     }
     </style>
     """, unsafe_allow_html=True)
@@ -228,3 +232,4 @@ elif st.session_state.pantalla == "historial_completo":
             st.rerun()
     else:
         st.info("No hay registros guardados en esta sesión.")
+
