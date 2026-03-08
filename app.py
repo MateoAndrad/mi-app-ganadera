@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
+from streamlit_gsheets import GSheetsConnection
 
 # 1. CONFIGURACIÓN DE PÁGINA
 st.set_page_config(
@@ -14,6 +15,7 @@ st.set_page_config(
 if 'pantalla' not in st.session_state:
     st.session_state.pantalla = "inicio" 
 
+# Mantenemos el historial local por si acaso, pero priorizamos la nube
 if 'historial_diio' not in st.session_state:
     st.session_state.historial_diio = []
 
@@ -63,6 +65,9 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# --- CONEXIÓN A GOOGLE SHEETS ---
+conn = st.connection("gsheets", type=GSheetsConnection)
+
 # --- BASE DE DATOS TÉCNICA COMPLETA ---
 RAZAS = {
     "Aberdeen Angus": 1.10, "Hereford": 1.05, "Charolais": 1.15, "Limousin": 1.12, 
@@ -93,12 +98,25 @@ def to_excel(df):
         df.to_excel(writer, index=False, sheet_name='Reporte_Tecnico')
     return output.getvalue()
 
+# --- BARRA LATERAL CON PRIVACIDAD ---
+with st.sidebar:
+    st.image("logo.png", use_container_width=True)
+    st.markdown("### 🔑 Acceso Privado")
+    user_gsheet_url = st.text_input("URL de tu Google Sheet", type="password", help="Pega aquí el enlace de tu propia hoja de cálculo de Google")
+    
+    if st.session_state.pantalla == "app":
+        if st.button("🏠 VOLVER AL INICIO"):
+            st.session_state.pantalla = "inicio"
+            st.rerun()
+        st.markdown("---")
+        menu = st.radio("MENÚ DE GESTIÓN", ["📊 Simulador Individual", "⚖️ Comparador de Escenarios", "🆔 Registro de Animales (DIIO)"])
+
 # --- PANTALLA A: BIENVENIDA ---
 if st.session_state.pantalla == "inicio":
     st.markdown("<br><br>", unsafe_allow_html=True)
     col_w1, col_w2, col_w3 = st.columns([1, 2, 1])
     with col_w2:
-        st.markdown("<div class='welcome-text'><h1>🐄 GanadoPro Chile</h1><h3>Portal de Gestión Ganadera</h3><p>Seleccione una opción</p></div>", unsafe_allow_html=True)
+        st.markdown("<div class='welcome-text'><h1>🐄 GanadoPro Chile</h1><h3>Portal de Gestión Ganadera</h3><p>Configure su URL en la barra lateral para comenzar</p></div>", unsafe_allow_html=True)
         if st.button("🚀 ENTRAR A LA APP"):
             st.session_state.pantalla = "app"
             st.rerun()
@@ -108,13 +126,8 @@ if st.session_state.pantalla == "inicio":
 
 # --- PANTALLA B: APP ---
 elif st.session_state.pantalla == "app":
-    with st.sidebar:
-        st.image("logo.png", use_container_width=True)
-        if st.button("🏠 VOLVER AL INICIO"):
-            st.session_state.pantalla = "inicio"
-            st.rerun()
-        st.markdown("---")
-        menu = st.radio("MENÚ DE GESTIÓN", ["📊 Simulador Individual", "⚖️ Comparador de Escenarios", "🆔 Registro de Animales (DIIO)"])
+    if not user_gsheet_url:
+        st.warning("⚠️ Por favor, ingresa la URL de tu Google Sheet en la barra lateral para habilitar el guardado.")
 
     if menu == "📊 Simulador Individual":
         st.header("Simulador de Viabilidad Ganadera")
@@ -200,26 +213,53 @@ elif st.session_state.pantalla == "app":
             raza_reg = col_reg2.selectbox("Raza", list(RAZAS.keys()))
             peso_act = col_reg3.number_input("Peso Actual (kg)", min_value=0.0)
             f_vacuna = col_reg4.date_input("Fecha Vacuna", datetime.now())
+            
             if st.form_submit_button("Guardar en Historial"):
                 if diio:
-                    st.session_state.historial_diio.append({
+                    nuevo_registro = {
                         "Fecha Registro": datetime.now().strftime("%d/%m/%Y"),
-                        "DIIO": diio, "Raza": raza_reg, "Peso (kg)": peso_act, "Última Vacuna": f_vacuna.strftime("%d/%m/%Y")
-                    })
-                    st.success(f"Animal {diio} registrado.")
+                        "DIIO": diio, "Raza": raza_reg, "Peso (kg)": peso_act, 
+                        "Última Vacuna": f_vacuna.strftime("%d/%m/%Y")
+                    }
+                    
+                    # 1. Guardar en sesión local
+                    st.session_state.historial_diio.append(nuevo_registro)
+                    
+                    # 2. Guardar en Nube si hay URL
+                    if user_gsheet_url:
+                        try:
+                            existente = conn.read(spreadsheet=user_gsheet_url)
+                            actualizado = pd.concat([existente, pd.DataFrame([nuevo_registro])], ignore_index=True)
+                            conn.update(spreadsheet=user_gsheet_url, data=actualizado)
+                            st.success(f"Animal {diio} guardado en la NUBE y Local.")
+                        except:
+                            st.error("Error al conectar con tu Google Sheet. Verifica la URL y permisos.")
+                    else:
+                        st.warning(f"Animal {diio} guardado solo en sesión LOCAL (se borrará al cerrar).")
 
 # --- PANTALLA C: HISTORIAL ---
 elif st.session_state.pantalla == "historial_completo":
-    st.header("📂 Historial Acumulado")
+    st.header("📂 Historial de Gestión")
     if st.button("⬅️ VOLVER AL INICIO"):
         st.session_state.pantalla = "inicio"
         st.rerun()
+
+    if user_gsheet_url:
+        st.subheader("Datos desde tu Google Sheet")
+        try:
+            df_cloud = conn.read(spreadsheet=user_gsheet_url)
+            st.dataframe(df_cloud, use_container_width=True)
+            st.download_button("📥 DESCARGAR EXCEL NUBE", data=to_excel(df_cloud), file_name="Historial_Nube.xlsx")
+        except:
+            st.error("No se pudo cargar la hoja de cálculo. Revisa la URL.")
+    
+    st.markdown("---")
+    st.subheader("Datos de Sesión Actual (Local)")
     if st.session_state.historial_diio:
         df_hist = pd.DataFrame(st.session_state.historial_diio)
         st.dataframe(df_hist, use_container_width=True)
-        st.download_button("📥 DESCARGAR EXCEL", data=to_excel(df_hist), file_name="Historial_DIIO.xlsx")
-        if st.button("🗑️ LIMPIAR HISTORIAL"):
+        if st.button("🗑️ LIMPIAR LOCAL"):
             st.session_state.historial_diio = []
             st.rerun()
     else:
-        st.info("No hay registros.")
+        st.info("No hay registros locales en esta sesión.")
