@@ -10,18 +10,30 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- INICIALIZACIÓN DE ESTADOS (Control de Pantalla e Historial) ---
+# --- INICIALIZACIÓN DE ESTADOS ---
 if 'pantalla' not in st.session_state:
-    st.session_state.pantalla = "inicio"  # Estado inicial
+    st.session_state.pantalla = "inicio" 
 
 if 'historial_diio' not in st.session_state:
     st.session_state.historial_diio = []
 
-# 2. ESTILO PROFESIONAL (Actualizado para el Hub)
+# 2. ESTILO PROFESIONAL Y PARCHE PARA MÓVILES (Fondo Blanco + Letras Oscuras)
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
-    [data-testid="stMetricValue"] { color: #1f2937 !important; }
+    
+    /* FIX PARA DESPLEGABLES EN MÓVILES */
+    div[data-baseweb="select"] > div {
+        background-color: white !important;
+        color: #1f2937 !important;
+    }
+    div[role="listbox"] ul li {
+        color: #1f2937 !important;
+        background-color: white !important;
+    }
+    
+    /* VISIBILIDAD DE MÉTRICAS */
+    [data-testid="stMetricValue"] { color: #1f2937 !important; font-weight: bold; }
     [data-testid="stMetricLabel"] { color: #4b5563 !important; }
     .stMetric { 
         background-color: #ffffff; 
@@ -30,13 +42,15 @@ st.markdown("""
         border-radius: 10px; 
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    /* Estilo para los botones gigantes de bienvenida */
+    
+    /* BOTONES GIGANTES */
     .stButton>button {
         height: 100px;
         font-size: 20px !important;
         border-radius: 15px;
         font-weight: bold;
     }
+    
     .welcome-text {
         text-align: center;
         padding: 40px;
@@ -44,15 +58,12 @@ st.markdown("""
         border-radius: 20px;
         box-shadow: 0 10px 25px rgba(0,0,0,0.05);
         margin-bottom: 30px;
-        color: #1f2937 !important; /* Color oscuro para las letras */
-    }
-    .welcome-text h1, .welcome-text h3, .welcome-text p {
-        color: #1f2937 !important; /* Asegura que títulos y párrafos se vean */
+        color: #1f2937 !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- BASE DE DATOS TÉCNICA ---
+# --- BASE DE DATOS TÉCNICA COMPLETA ---
 RAZAS = {
     "Aberdeen Angus": 1.10, "Hereford": 1.05, "Charolais": 1.15, "Limousin": 1.12, 
     "Shorthorn": 1.02, "Blonda de Aquitania": 1.14, "Rubia Gallega": 1.08, "Wagyu (Kobe)": 0.95,
@@ -67,12 +78,10 @@ def calcular_todo(raza, peso_ini, precio_compra, dias, tipo_pasto, alimento_ha, 
     gdp_base = {"Pradera Natural Degradada": 0.30, "Pradera Natural Mejorada": 0.55, "Pastura Sembrada": 0.85, "Alfalfa": 1.05, "Feedlot": 1.30}
     gdp_final = gdp_base[tipo_pasto] * RAZAS[raza]
     peso_fin = peso_ini + (gdp_final * dias)
-    
     peso_promedio = (peso_ini + peso_fin) / 2
     consumo_total = (peso_promedio * 0.03) * dias
     alimento_disponible = (alimento_ha * superficie) * 0.70
     capacidad_max = int(alimento_disponible / consumo_total) if consumo_total > 0 else 0
-    
     inv_total = ((peso_ini * precio_compra) + (costo_fijo_dia * dias) + costo_sanidad) * num_animales + costo_flete
     ingreso_total = (peso_fin * precio_venta) * num_animales
     utilidad = ingreso_total - inv_total
@@ -84,36 +93,20 @@ def to_excel(df):
         df.to_excel(writer, index=False, sheet_name='Reporte_Tecnico')
     return output.getvalue()
 
-# =========================================================
-# LÓGICA DE NAVEGACIÓN (PANTALLAS)
-# =========================================================
-
 # --- PANTALLA A: BIENVENIDA ---
 if st.session_state.pantalla == "inicio":
     st.markdown("<br><br>", unsafe_allow_html=True)
     col_w1, col_w2, col_w3 = st.columns([1, 2, 1])
-    
     with col_w2:
-        st.markdown("""
-            <div class='welcome-text'>
-                <h1>🐄 GanadoPro Chile</h1>
-                <h3>Bienvenido al Portal de Gestión Ganadera</h3>
-                <p>Seleccione una opción para comenzar</p>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        st.write("")
-        c_btn1, c_btn2 = st.columns(2)
-        
-        if c_btn1.button("🚀 ENTRAR A LA APP\n(Simulador y Gestión)"):
+        st.markdown("<div class='welcome-text'><h1>🐄 GanadoPro Chile</h1><h3>Portal de Gestión Ganadera</h3><p>Seleccione una opción</p></div>", unsafe_allow_html=True)
+        if st.button("🚀 ENTRAR A LA APP"):
             st.session_state.pantalla = "app"
             st.rerun()
-            
-        if c_btn2.button("📂 VER HISTORIAL\n(DIIO y Sanidad)"):
+        if st.button("📂 VER HISTORIAL"):
             st.session_state.pantalla = "historial_completo"
             st.rerun()
 
-# --- PANTALLA B: LA APLICACIÓN (Simulador y Comparador) ---
+# --- PANTALLA B: APP ---
 elif st.session_state.pantalla == "app":
     with st.sidebar:
         st.image("logo.png", use_container_width=True)
@@ -122,47 +115,40 @@ elif st.session_state.pantalla == "app":
             st.rerun()
         st.markdown("---")
         menu = st.radio("MENÚ DE GESTIÓN", ["📊 Simulador Individual", "⚖️ Comparador de Escenarios", "🆔 Registro de Animales (DIIO)"])
-        st.markdown("---")
 
     if menu == "📊 Simulador Individual":
         st.header("Simulador de Viabilidad Ganadera")
-        with st.container():
-            col_setup, col_ani = st.columns([1, 2])
-            with col_setup:
-                st.subheader("🌐 Parámetros de Campo")
-                al_ha = st.number_input("Rendimiento (kg MS/ha/año)", value=5000)
-                sup = st.number_input("Superficie Total (ha)", value=1.0)
-                st.markdown("---")
-                st.subheader("🚚 Logística")
-                dist = st.number_input("Distancia (km)", value=100)
-                dies = st.number_input("Precio Diesel ($/L)", value=1100)
-                flete_ind = (dist / 4.0 * dies)
+        col_setup, col_ani = st.columns([1, 2])
+        with col_setup:
+            st.subheader("🌐 Parámetros de Campo")
+            al_ha = st.number_input("Rendimiento (kg MS/ha/año)", value=5000)
+            sup = st.number_input("Superficie Total (ha)", value=1.0)
+            st.markdown("---")
+            st.subheader("🚚 Logística")
+            dist = st.number_input("Distancia (km)", value=100)
+            dies = st.number_input("Precio Diesel ($/L)", value=1100)
+            flete_ind = (dist / 4.0 * dies)
 
-            with col_ani:
-                st.subheader("🐄 Especificaciones del Lote")
-                c1, c2 = st.columns(2)
-                with c1:
-                    rz = st.selectbox("Seleccione Raza", list(RAZAS.keys()))
-                    pst = st.selectbox("Sistema de Alimentación", ["Pradera Natural Degradada", "Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa", "Feedlot"])
-                    n_ani = st.number_input("Cabezas de Ganado", value=1, min_value=1)
-                with c2:
-                    p_i = st.number_input("Peso de Entrada (kg)", value=220.0)
-                    p_c = st.number_input("Costo Compra ($/kg)", value=1900)
-                    p_v_base = st.number_input("Proyección Venta ($/kg)", value=2150)
-                    d_e = st.slider("Días de Engorda", 30, 365, 120)
+        with col_ani:
+            st.subheader("🐄 Especificaciones del Lote")
+            c1, c2 = st.columns(2)
+            rz = c1.selectbox("Seleccione Raza", list(RAZAS.keys()))
+            pst = c1.selectbox("Sistema de Alimentación", ["Pradera Natural Degradada", "Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa", "Feedlot"])
+            n_ani = c1.number_input("Cabezas de Ganado", value=1, min_value=1)
+            p_i = c2.number_input("Peso de Entrada (kg)", value=220.0)
+            p_c = c2.number_input("Costo Compra ($/kg)", value=1900)
+            p_v_base = c2.number_input("Proyección Venta ($/kg)", value=2150)
+            d_e = st.slider("Días de Engorda", 30, 365, 120)
 
-        # PUNTO 2: SENSIBILIDAD
         st.markdown("---")
         st.subheader("📉 Análisis de Sensibilidad")
-        with st.expander("Ver impacto de variaciones de mercado"):
-            sens_col1, sens_col2 = st.columns(2)
-            var_precio = sens_col1.slider("Variación Precio Venta (%)", -20, 20, 0)
-            var_mortalidad = sens_col2.slider("Tasa de Mortalidad (%)", 0, 10, 0)
+        with st.expander("Ver impacto de variaciones"):
+            s1, s2 = st.columns(2)
+            var_precio = s1.slider("Variación Precio Venta (%)", -20, 20, 0)
+            var_mortalidad = s2.slider("Tasa de Mortalidad (%)", 0, 10, 0)
             precio_sens = p_v_base * (1 + var_precio/100)
             p_f, c_max, ut_base, inv_t = calcular_todo(rz, p_i, p_c, d_e, pst, al_ha, sup, n_ani, flete_ind, 600, 18000, precio_sens)
-            animales_finales = n_ani * (1 - var_mortalidad/100)
-            ingreso_real = (p_f * precio_sens) * animales_finales
-            ut_total = ingreso_real - inv_t
+            ut_total = ((p_f * precio_sens) * (n_ani * (1 - var_mortalidad/100))) - inv_t
 
         st.markdown("### 📈 Panel de Resultados")
         m1, m2, m3, m4 = st.columns(4)
@@ -176,60 +162,64 @@ elif st.session_state.pantalla == "app":
         else: st.error("❌ ESCENARIO CON PÉRDIDAS")
 
         st.markdown("---")
-        df_ind = pd.DataFrame({"Métrica": ["Raza", "N° Cabezas", "Utilidad"], "Detalle": [rz, n_ani, f"${ut_total:,.0f}"]})
+        st.subheader("🛠️ Gestión de Mantenimiento")
+        exp1, exp2 = st.columns(2)
+        exp1.info(f"**Requerimiento Hídrico:** {n_ani * 50} L/día")
+        exp1.checkbox("Bebederos Operativos")
+        rezago = "25-35 días" if pst != "Feedlot" else "N/A"
+        exp2.warning(f"**Periodo de Rezago:** {rezago}")
+        exp2.checkbox("Protocolo de Vacunación")
+
+        st.markdown("---")
+        df_ind = pd.DataFrame({"Métrica": ["Raza", "Cabezas", "Utilidad"], "Detalle": [rz, n_ani, f"${ut_total:,.0f}"]})
         st.download_button("📥 EXPORTAR REPORTE", data=to_excel(df_ind), file_name=f"Reporte_{rz}.xlsx")
         st.line_chart({"Curva de Peso (kg)": [p_i, p_f]})
 
     elif menu == "⚖️ Comparador de Escenarios":
-        st.header("Análisis Comparativo de Escenarios")
+        st.header("Análisis Comparativo")
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("#### Escenario A")
-            rA = st.selectbox("Raza A", list(RAZAS.keys()))
-            pstA = st.selectbox("Pasto A", ["Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa"])
+            rA = st.selectbox("Raza A", list(RAZAS.keys()), key="ra")
+            pstA = st.selectbox("Pasto A", ["Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa"], key="pa")
             pfA, cpA, utA, invA = calcular_todo(rA, 220, 1900, 120, pstA, 5000, 1, 10, 0, 600, 18000, 2100)
-            st.metric("Utilidad Lote A", f"${utA:,.0f}")
+            st.metric("Utilidad A", f"${utA:,.0f}")
         with c2:
             st.markdown("#### Escenario B")
-            rB = st.selectbox("Raza B", list(RAZAS.keys()))
-            pstB = st.selectbox("Pasto B", ["Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa"])
+            rB = st.selectbox("Raza B", list(RAZAS.keys()), key="rb")
+            pstB = st.selectbox("Pasto B", ["Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa"], key="pb")
             pfB, cpB, utB, invB = calcular_todo(rB, 220, 1900, 120, pstB, 5000, 1, 10, 0, 600, 18000, 2100)
-            st.metric("Utilidad Lote B", f"${utB:,.0f}")
-        st.bar_chart({"A": utA, "B": utB})
+            st.metric("Utilidad B", f"${utB:,.0f}")
+        st.bar_chart({"Escenario A": utA, "Escenario B": utB})
 
     elif menu == "🆔 Registro de Animales (DIIO)":
-        st.header("Registro Individual y Sanidad")
+        st.header("Registro DIIO y Sanidad")
         with st.form("nuevo_registro"):
             col_reg1, col_reg2, col_reg3, col_reg4 = st.columns(4)
             diio = col_reg1.text_input("Número DIIO")
             raza_reg = col_reg2.selectbox("Raza", list(RAZAS.keys()))
-            peso_act = col_reg3.number_input("Peso (kg)", min_value=0.0)
+            peso_act = col_reg3.number_input("Peso Actual (kg)", min_value=0.0)
             f_vacuna = col_reg4.date_input("Fecha Vacuna", datetime.now())
-            if st.form_submit_button("Guardar"):
+            if st.form_submit_button("Guardar en Historial"):
                 if diio:
                     st.session_state.historial_diio.append({
                         "Fecha Registro": datetime.now().strftime("%d/%m/%Y"),
                         "DIIO": diio, "Raza": raza_reg, "Peso (kg)": peso_act, "Última Vacuna": f_vacuna.strftime("%d/%m/%Y")
                     })
-                    st.success("Registrado con éxito")
+                    st.success(f"Animal {diio} registrado.")
 
-# --- PANTALLA C: HISTORIAL COMPLETO ---
+# --- PANTALLA C: HISTORIAL ---
 elif st.session_state.pantalla == "historial_completo":
-    st.header("📂 Historial Acumulado de Gestión")
+    st.header("📂 Historial Acumulado")
     if st.button("⬅️ VOLVER AL INICIO"):
         st.session_state.pantalla = "inicio"
         st.rerun()
-    
-    st.markdown("---")
     if st.session_state.historial_diio:
         df_hist = pd.DataFrame(st.session_state.historial_diio)
         st.dataframe(df_hist, use_container_width=True)
-        
-        c_h1, c_h2 = st.columns(2)
-        c_h1.download_button("📥 DESCARGAR HISTORIAL EXCEL", data=to_excel(df_hist), file_name="Historial_DIIO.xlsx")
-        if c_h2.button("🗑️ LIMPIAR TODO EL HISTORIAL"):
+        st.download_button("📥 DESCARGAR EXCEL", data=to_excel(df_hist), file_name="Historial_DIIO.xlsx")
+        if st.button("🗑️ LIMPIAR HISTORIAL"):
             st.session_state.historial_diio = []
             st.rerun()
     else:
-        st.info("No hay registros guardados en esta sesión.")
-
+        st.info("No hay registros.")
