@@ -80,9 +80,27 @@ if menu == "Simulador Individual":
     elif ut_total > 0: st.success("✅ PROYECTO VIABLE"); st.balloons()
     else: st.error("❌ PÉRDIDA")
 
+    # --- NUEVA SECCIÓN: MANTENIMIENTO Y CUIDADO (SIN QUITAR NADA) ---
+    st.subheader("🛠️ Checklist de Mantenimiento y Cuidados")
+    exp1, exp2 = st.columns(2)
+    
+    with exp1:
+        st.write("**🚿 Hidratación y Bienestar**")
+        litros_agua = n_ani * 50 # Estimación promedio 50L/día
+        st.info(f"Necesidad de Agua: **{litros_agua} Litros/día** para el lote.")
+        st.checkbox("¿Bebederos limpios y con caudal suficiente?")
+        st.checkbox("¿Acceso a sombra o refugio disponible?")
+
+    with exp2:
+        st.write("**💉 Sanidad y Suelo**")
+        st.checkbox("Vacunación (Clostridiales/Selenio) al día")
+        st.checkbox("Control de parásitos (Fasciola/Gastrointestinales)")
+        rezago = "25-35 días" if pst != "Feedlot" else "N/A"
+        st.warning(f"Rezago recomendado del potrero: **{rezago}**")
+
     # REPORTE EXCEL INDIVIDUAL
-    df_ind = pd.DataFrame({"Dato": ["Raza", "Animales", "Peso Final", "Utilidad", "Flete"], 
-                           "Valor": [rz, n_ani, f"{p_f:.1f} kg", f"${ut_total:,.0f}", f"${flete_ind:,.0f}"]})
+    df_ind = pd.DataFrame({"Dato": ["Raza", "Animales", "Peso Final", "Utilidad", "Flete", "Agua necesaria (L/día)"], 
+                           "Valor": [rz, n_ani, f"{p_f:.1f} kg", f"${ut_total:,.0f}", f"${flete_ind:,.0f}", litros_agua]})
     st.download_button("📥 Descargar Reporte Individual", data=to_excel(df_ind), file_name=f"Reporte_{rz}.xlsx")
     st.line_chart({"Peso (kg)": [p_i, p_f]})
 
@@ -104,12 +122,15 @@ elif menu == "Comparador de Escenarios":
         pstA = st.selectbox("Pasto A", ["Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa"], key="pa")
         pfA, cpA, utA, invA = calcular_todo(rA, 220, 1900, 120, pstA, 5000, 1, 10, flete_c, 600, 18000, 2100)
         st.metric("Utilidad A", f"${utA:,.0f}")
+        st.write(f"💧 Agua Req: {10*50} L/día")
+        
     with c2:
         st.subheader("Escenario B")
         rB = st.selectbox("Raza B", list(RAZAS.keys()), key="rb")
         pstB = st.selectbox("Pasto B", ["Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa"], key="pb")
         pfB, cpB, utB, invB = calcular_todo(rB, 220, 1900, 120, pstB, 5000, 1, 10, flete_c, 600, 18000, 2100)
         st.metric("Utilidad B", f"${utB:,.0f}")
+        st.write(f"💧 Agua Req: {10*50} L/día")
 
     # REPORTE EXCEL COMPARATIVO
     df_comp = pd.DataFrame({
