@@ -239,7 +239,7 @@ elif st.session_state.pantalla == "app":
                     st.balloons() # Animación para confirmar
                 except Exception as e:
                     st.error(f"❌ Error técnico: {e}")
-                    st.info("💡 RECUERDA: En Google Sheets -> Compartir -> Cualquier persona con el enlace -> debe decir EDITOR.")}
+                    st.info("💡 RECUERDA: En Google Sheets -> Compartir -> Cualquier persona con el enlace -> debe decir EDITOR.")
                     
                     # 1. Guardar en sesión local
                     st.session_state.historial_diio.append(nuevo_registro)
@@ -282,5 +282,6 @@ elif st.session_state.pantalla == "historial_completo":
             st.rerun()
     else:
         st.info("No hay registros locales en esta sesión.")
+
 
 
