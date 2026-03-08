@@ -215,11 +215,31 @@ elif st.session_state.pantalla == "app":
             f_vacuna = col_reg4.date_input("Fecha Vacuna", datetime.now())
             
             if st.form_submit_button("Guardar en Historial"):
-                if diio:
-                    nuevo_registro = {
-                        "Fecha Registro": datetime.now().strftime("%d/%m/%Y"),
-                        "DIIO": diio, "Raza": raza_reg, "Peso (kg)": peso_act, 
-                        "Última Vacuna": f_vacuna.strftime("%d/%m/%Y")
+            if not user_url:
+                st.error("❌ Falta la URL en la barra lateral")
+            else:
+                try:
+                    # Intentamos leer la hoja. Si falla aquí, es un tema de PERMISOS (Editor)
+                    df_actual = conn.read(spreadsheet=user_url, usecols=[0,1,2,3]) 
+                    
+                    # Creamos el nuevo dato
+                    nuevo = pd.DataFrame([{
+                        "Fecha": datetime.now().strftime("%d/%m/%Y"),
+                        "DIIO": str(d_id), 
+                        "Raza": d_rz, 
+                        "Peso": float(d_p)
+                    }])
+                    
+                    # Concatenamos
+                    df_final = pd.concat([df_actual, nuevo], ignore_index=True)
+                    
+                    # Subimos de nuevo
+                    conn.update(spreadsheet=user_url, data=df_final)
+                    st.success("✅ ¡Guardado exitosamente!")
+                    st.balloons() # Animación para confirmar
+                except Exception as e:
+                    st.error(f"❌ Error técnico: {e}")
+                    st.info("💡 RECUERDA: En Google Sheets -> Compartir -> Cualquier persona con el enlace -> debe decir EDITOR.")
                     }
                     
                     # 1. Guardar en sesión local
@@ -263,3 +283,4 @@ elif st.session_state.pantalla == "historial_completo":
             st.rerun()
     else:
         st.info("No hay registros locales en esta sesión.")
+
