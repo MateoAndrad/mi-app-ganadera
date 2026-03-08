@@ -9,11 +9,20 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. ESTILO PROFESIONAL (CSS mínimo para prolijidad)
+# 2. ESTILO PROFESIONAL (CSS corregido para visibilidad de letras)
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
-    .stMetric { background-color: #ffffff; border: 1px solid #e0e0e0; padding: 15px; border-radius: 10px; }
+    /* Estilo de las tarjetas de métricas */
+    [data-testid="stMetricValue"] { color: #1f2937 !important; } /* Color del número principal */
+    [data-testid="stMetricLabel"] { color: #4b5563 !important; } /* Color de la etiqueta superior */
+    .stMetric { 
+        background-color: #ffffff; 
+        border: 1px solid #e0e0e0; 
+        padding: 15px; 
+        border-radius: 10px; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -167,8 +176,8 @@ elif menu == "⚖️ Comparador de Escenarios":
 
     df_comp = pd.DataFrame({
         "Métrica": ["Raza", "Utilidad Total", "Diferencia"],
-        "Escenario A": [rA, f"${utA:,.0f}", f"${utA-utB:,.0f}"],
-        "Escenario B": [rB, f"${utB:,.0f}", f"${utB-utA:,.0f}"]
+        "Escenario A": [rA, pstA, f"${utA:,.0f}", f"${utA-utB:,.0f}"],
+        "Escenario B": [rB, pstB, f"${utB:,.0f}", f"${utB-utA:,.0f}"]
     })
     st.download_button("📥 DESCARGAR COMPARATIVA", data=to_excel(df_comp), file_name="Comparativa_Tecnica.xlsx")
     st.bar_chart({"Utilidad Escenario A": utA, "Utilidad Escenario B": utB})
