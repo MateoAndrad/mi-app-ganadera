@@ -10,11 +10,14 @@ st.set_page_config(
     layout="wide"
 )
 
-# Inicializar Historial en la sesión si no existe (Punto 5)
+# --- INICIALIZACIÓN DE ESTADOS (Control de Pantalla e Historial) ---
+if 'pantalla' not in st.session_state:
+    st.session_state.pantalla = "inicio"  # Estado inicial
+
 if 'historial_diio' not in st.session_state:
     st.session_state.historial_diio = []
 
-# 2. ESTILO PROFESIONAL
+# 2. ESTILO PROFESIONAL (Actualizado para el Hub)
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -27,21 +30,32 @@ st.markdown("""
         border-radius: 10px; 
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
+    /* Estilo para los botones gigantes de bienvenida */
+    .stButton>button {
+        height: 100px;
+        font-size: 20px !important;
+        border-radius: 15px;
+        font-weight: bold;
+    }
+    .welcome-text {
+        text-align: center;
+        padding: 40px;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        margin-bottom: 30px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. BARRA LATERAL
-with st.sidebar:
-    st.image("logo.png", use_container_width=True)
-    st.markdown("---")
-    menu = st.radio("MENÚ DE GESTIÓN", ["📊 Simulador Individual", "⚖️ Comparador de Escenarios", "🆔 Registro de Animales (DIIO)"])
-    st.markdown("---")
-
 # --- BASE DE DATOS TÉCNICA ---
 RAZAS = {
-    "Clavel / Overo Colorado": 1.08, "Aberdeen Angus": 1.10, "Hereford": 1.05, 
-    "Holstein (Lechero)": 0.75, "Charolais": 1.15, "Limousin": 1.12, "Simmental": 1.08,
-    "Normando": 0.98, "Parda Suiza": 1.00, "Brahman": 0.90, "Brangus": 1.02, "Wagyu": 0.95
+    "Aberdeen Angus": 1.10, "Hereford": 1.05, "Charolais": 1.15, "Limousin": 1.12, 
+    "Shorthorn": 1.02, "Blonda de Aquitania": 1.14, "Rubia Gallega": 1.08, "Wagyu (Kobe)": 0.95,
+    "Simmental": 1.08, "Normando": 0.98, "Parda Suiza": 1.00, "Fleckvieh": 1.07,
+    "Brahman": 0.90, "Nelore": 0.88, "Guzerat": 0.89, "Gyr": 0.82, "Indubrasil": 0.87,
+    "Brangus": 1.02, "Braford": 1.00, "Santa Gertrudis": 0.97, "Beefmaster": 1.01,
+    "Girolando": 0.85, "Holstein": 0.75, "Jersey": 0.65, "Ayrshire": 0.72
 }
 
 # --- MOTOR DE CÁLCULO ---
@@ -66,150 +80,151 @@ def to_excel(df):
         df.to_excel(writer, index=False, sheet_name='Reporte_Tecnico')
     return output.getvalue()
 
-# ---------------------------------------------------------
-# APARTADO 1: SIMULADOR INDIVIDUAL
-# ---------------------------------------------------------
-if menu == "📊 Simulador Individual":
-    st.header("Simulador de Viabilidad Ganadera")
+# =========================================================
+# LÓGICA DE NAVEGACIÓN (PANTALLAS)
+# =========================================================
+
+# --- PANTALLA A: BIENVENIDA ---
+if st.session_state.pantalla == "inicio":
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    col_w1, col_w2, col_w3 = st.columns([1, 2, 1])
     
-    with st.container():
-        col_setup, col_ani = st.columns([1, 2])
-        with col_setup:
-            st.subheader("🌐 Parámetros de Campo")
-            al_ha = st.number_input("Rendimiento (kg MS/ha/año)", value=5000)
-            sup = st.number_input("Superficie Total (ha)", value=1.0)
-            st.markdown("---")
-            st.subheader("🚚 Logística")
-            dist = st.number_input("Distancia (km)", value=100)
-            dies = st.number_input("Precio Diesel ($/L)", value=1100)
-            flete_ind = (dist / 4.0 * dies)
-
-        with col_ani:
-            st.subheader("🐄 Especificaciones del Lote")
-            c1, c2 = st.columns(2)
-            with c1:
-                rz = st.selectbox("Seleccione Raza", list(RAZAS.keys()))
-                pst = st.selectbox("Sistema de Alimentación", ["Pradera Natural Degradada", "Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa", "Feedlot"])
-                n_ani = st.number_input("Cabezas de Ganado", value=1, min_value=1)
-            with c2:
-                p_i = st.number_input("Peso de Entrada (kg)", value=220.0)
-                p_c = st.number_input("Costo Compra ($/kg)", value=1900)
-                p_v_base = st.number_input("Proyección Venta ($/kg)", value=2150)
-                d_e = st.slider("Días de Engorda", 30, 365, 120)
-
-    # --- PUNTO 2: ANÁLISIS DE SENSIBILIDAD ---
-    st.markdown("---")
-    st.subheader("📉 Análisis de Sensibilidad (Escenarios Críticos)")
-    with st.expander("Ver impacto de variaciones de mercado"):
-        sens_col1, sens_col2 = st.columns(2)
-        with sens_col1:
-            var_precio = st.slider("Variación Precio Venta (%)", -20, 20, 0)
-            var_mortalidad = st.slider("Tasa de Mortalidad proyectada (%)", 0, 10, 0)
+    with col_w2:
+        st.markdown("""
+            <div class='welcome-text'>
+                <h1>🐄 GanadoPro Chile</h1>
+                <h3>Bienvenido al Portal de Gestión Ganadera</h3>
+                <p>Seleccione una opción para comenzar</p>
+            </div>
+        """, unsafe_allow_html=True)
         
-        precio_sens = p_v_base * (1 + var_precio/100)
-        p_f, c_max, ut_base, inv_t = calcular_todo(rz, p_i, p_c, d_e, pst, al_ha, sup, n_ani, flete_ind, 600, 18000, precio_sens)
+        st.write("")
+        c_btn1, c_btn2 = st.columns(2)
         
-        animales_finales = n_ani * (1 - var_mortalidad/100)
-        ingreso_real = (p_f * precio_sens) * animales_finales
-        ut_total = ingreso_real - inv_t
+        if c_btn1.button("🚀 ENTRAR A LA APP\n(Simulador y Gestión)"):
+            st.session_state.pantalla = "app"
+            st.rerun()
+            
+        if c_btn2.button("📂 VER HISTORIAL\n(DIIO y Sanidad)"):
+            st.session_state.pantalla = "historial_completo"
+            st.rerun()
 
-    # Panel de Resultados
-    st.markdown("### 📈 Panel de Resultados")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Peso Final Est.", f"{p_f:.1f} kg")
-    m2.metric("Capacidad Máx.", f"{c_max} Cabezas")
-    m3.metric("Utilidad Final", f"${ut_total:,.0f} CLP", delta=f"{var_precio}% Precio")
-    m4.metric("ROI Estimado", f"{(ut_total/inv_t)*100:.1f}%")
-
-    if n_ani > c_max: st.error(f"⚠️ SOBREPASTOREO: Máximo {c_max} cabezas.")
-    elif ut_total > 0: st.success("✔️ PROYECTO VIABLE")
-    else: st.error("❌ ESCENARIO CON PÉRDIDAS")
-
-    # Checklist Técnico
-    st.markdown("---")
-    st.subheader("🛠️ Gestión de Mantenimiento")
-    exp1, exp2 = st.columns(2)
-    with exp1:
-        litros_agua = n_ani * 50
-        st.info(f"**Requerimiento Hídrico:** {litros_agua} L/día")
-        st.checkbox("Bebederos y Suministro Operativo")
-    with exp2:
-        rezago = "25-35 días" if pst != "Feedlot" else "N/A"
-        st.warning(f"**Periodo de Rezago:** {rezago}")
-        st.checkbox("Protocolo de Vacunación al día")
-
-    # Descargas y Gráficos
-    st.markdown("---")
-    df_ind = pd.DataFrame({"Métrica": ["Raza", "N° Cabezas", "Utilidad", "Mortalidad Calc."], 
-                           "Detalle": [rz, n_ani, f"${ut_total:,.0f}", f"{var_mortalidad}%"]})
-    st.download_button("📥 EXPORTAR REPORTE (EXCEL)", data=to_excel(df_ind), file_name=f"Informe_{rz}.xlsx")
-    st.line_chart({"Curva de Peso (kg)": [p_i, p_f]})
-
-# ---------------------------------------------------------
-# APARTADO 2: COMPARADOR
-# ---------------------------------------------------------
-elif menu == "⚖️ Comparador de Escenarios":
-    st.header("Análisis Comparativo de Escenarios")
+# --- PANTALLA B: LA APLICACIÓN (Simulador y Comparador) ---
+elif st.session_state.pantalla == "app":
     with st.sidebar:
-        dist_c = st.number_input("Distancia (km)", value=100)
-        dies_c = st.number_input("Diesel ($/L)", value=1100)
-        flete_c = (dist_c / 4.0 * dies_c)
-
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("#### Escenario A")
-        rA = st.selectbox("Raza A", list(RAZAS.keys()), key="ra")
-        pstA = st.selectbox("Pasto A", ["Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa"], key="pa")
-        pfA, cpA, utA, invA = calcular_todo(rA, 220, 1900, 120, pstA, 5000, 1, 10, flete_c, 600, 18000, 2100)
-        st.metric("Utilidad Lote A", f"${utA:,.0f}")
-    with c2:
-        st.markdown("#### Escenario B")
-        rB = st.selectbox("Raza B", list(RAZAS.keys()), key="rb")
-        pstB = st.selectbox("Pasto B", ["Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa"], key="pb")
-        pfB, cpB, utB, invB = calcular_todo(rB, 220, 1900, 120, pstB, 5000, 1, 10, flete_c, 600, 18000, 2100)
-        st.metric("Utilidad Lote B", f"${utB:,.0f}")
-
-    df_comp = pd.DataFrame({"Métrica": ["Raza", "Pasto", "Utilidad"], "A": [rA, pstA, f"${utA:,.0f}"], "B": [rB, pstB, f"${utB:,.0f}"]})
-    st.download_button("📥 DESCARGAR COMPARATIVA", data=to_excel(df_comp), file_name="Comparativa.xlsx")
-    st.bar_chart({"Escenario A": utA, "Escenario B": utB})
-
-# ---------------------------------------------------------
-# APARTADO 3: REGISTRO DIIO + SANIDAD (PUNTO 5 ACTUALIZADO)
-# ---------------------------------------------------------
-elif menu == "🆔 Registro de Animales (DIIO)":
-    st.header("Base de Datos Individual (DIIO) y Sanidad")
-    st.write("Registre el peso y la última fecha de tratamiento sanitario.")
-
-    with st.form("nuevo_registro"):
-        col_reg1, col_reg2, col_reg3, col_reg4 = st.columns(4)
-        diio = col_reg1.text_input("Número DIIO (Arete)")
-        raza_reg = col_reg2.selectbox("Raza", list(RAZAS.keys()))
-        peso_act = col_reg3.number_input("Peso Actual (kg)", min_value=0.0)
-        f_vacuna = col_reg4.date_input("Fecha Última Vacuna", datetime.now())
-        btn_guardar = st.form_submit_button("Guardar en Historial")
-
-    if btn_guardar and diio:
-        nuevo_item = {
-            "Fecha Registro": datetime.now().strftime("%d/%m/%Y"),
-            "DIIO": diio,
-            "Raza": raza_reg,
-            "Peso (kg)": peso_act,
-            "Última Vacuna": f_vacuna.strftime("%d/%m/%Y")
-        }
-        st.session_state.historial_diio.append(nuevo_item)
-        st.success(f"Animal {diio} registrado correctamente.")
-
-    if st.session_state.historial_diio:
+        st.image("logo.png", use_container_width=True)
+        if st.button("🏠 VOLVER AL INICIO"):
+            st.session_state.pantalla = "inicio"
+            st.rerun()
         st.markdown("---")
+        menu = st.radio("MENÚ DE GESTIÓN", ["📊 Simulador Individual", "⚖️ Comparador de Escenarios", "🆔 Registro de Animales (DIIO)"])
+        st.markdown("---")
+
+    if menu == "📊 Simulador Individual":
+        st.header("Simulador de Viabilidad Ganadera")
+        with st.container():
+            col_setup, col_ani = st.columns([1, 2])
+            with col_setup:
+                st.subheader("🌐 Parámetros de Campo")
+                al_ha = st.number_input("Rendimiento (kg MS/ha/año)", value=5000)
+                sup = st.number_input("Superficie Total (ha)", value=1.0)
+                st.markdown("---")
+                st.subheader("🚚 Logística")
+                dist = st.number_input("Distancia (km)", value=100)
+                dies = st.number_input("Precio Diesel ($/L)", value=1100)
+                flete_ind = (dist / 4.0 * dies)
+
+            with col_ani:
+                st.subheader("🐄 Especificaciones del Lote")
+                c1, c2 = st.columns(2)
+                with c1:
+                    rz = st.selectbox("Seleccione Raza", list(RAZAS.keys()))
+                    pst = st.selectbox("Sistema de Alimentación", ["Pradera Natural Degradada", "Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa", "Feedlot"])
+                    n_ani = st.number_input("Cabezas de Ganado", value=1, min_value=1)
+                with c2:
+                    p_i = st.number_input("Peso de Entrada (kg)", value=220.0)
+                    p_c = st.number_input("Costo Compra ($/kg)", value=1900)
+                    p_v_base = st.number_input("Proyección Venta ($/kg)", value=2150)
+                    d_e = st.slider("Días de Engorda", 30, 365, 120)
+
+        # PUNTO 2: SENSIBILIDAD
+        st.markdown("---")
+        st.subheader("📉 Análisis de Sensibilidad")
+        with st.expander("Ver impacto de variaciones de mercado"):
+            sens_col1, sens_col2 = st.columns(2)
+            var_precio = sens_col1.slider("Variación Precio Venta (%)", -20, 20, 0)
+            var_mortalidad = sens_col2.slider("Tasa de Mortalidad (%)", 0, 10, 0)
+            precio_sens = p_v_base * (1 + var_precio/100)
+            p_f, c_max, ut_base, inv_t = calcular_todo(rz, p_i, p_c, d_e, pst, al_ha, sup, n_ani, flete_ind, 600, 18000, precio_sens)
+            animales_finales = n_ani * (1 - var_mortalidad/100)
+            ingreso_real = (p_f * precio_sens) * animales_finales
+            ut_total = ingreso_real - inv_t
+
+        st.markdown("### 📈 Panel de Resultados")
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Peso Final Est.", f"{p_f:.1f} kg")
+        m2.metric("Capacidad Máx.", f"{c_max} Cabezas")
+        m3.metric("Utilidad Final", f"${ut_total:,.0f} CLP", delta=f"{var_precio}% Precio")
+        m4.metric("ROI Estimado", f"{(ut_total/inv_t)*100:.1f}%")
+
+        if n_ani > c_max: st.error(f"⚠️ SOBREPASTOREO: Máximo {c_max} cabezas.")
+        elif ut_total > 0: st.success("✔️ PROYECTO VIABLE")
+        else: st.error("❌ ESCENARIO CON PÉRDIDAS")
+
+        st.markdown("---")
+        df_ind = pd.DataFrame({"Métrica": ["Raza", "N° Cabezas", "Utilidad"], "Detalle": [rz, n_ani, f"${ut_total:,.0f}"]})
+        st.download_button("📥 EXPORTAR REPORTE", data=to_excel(df_ind), file_name=f"Reporte_{rz}.xlsx")
+        st.line_chart({"Curva de Peso (kg)": [p_i, p_f]})
+
+    elif menu == "⚖️ Comparador de Escenarios":
+        st.header("Análisis Comparativo de Escenarios")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("#### Escenario A")
+            rA = st.selectbox("Raza A", list(RAZAS.keys()))
+            pstA = st.selectbox("Pasto A", ["Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa"])
+            pfA, cpA, utA, invA = calcular_todo(rA, 220, 1900, 120, pstA, 5000, 1, 10, 0, 600, 18000, 2100)
+            st.metric("Utilidad Lote A", f"${utA:,.0f}")
+        with c2:
+            st.markdown("#### Escenario B")
+            rB = st.selectbox("Raza B", list(RAZAS.keys()))
+            pstB = st.selectbox("Pasto B", ["Pradera Natural Mejorada", "Pastura Sembrada", "Alfalfa"])
+            pfB, cpB, utB, invB = calcular_todo(rB, 220, 1900, 120, pstB, 5000, 1, 10, 0, 600, 18000, 2100)
+            st.metric("Utilidad Lote B", f"${utB:,.0f}")
+        st.bar_chart({"A": utA, "B": utB})
+
+    elif menu == "🆔 Registro de Animales (DIIO)":
+        st.header("Registro Individual y Sanidad")
+        with st.form("nuevo_registro"):
+            col_reg1, col_reg2, col_reg3, col_reg4 = st.columns(4)
+            diio = col_reg1.text_input("Número DIIO")
+            raza_reg = col_reg2.selectbox("Raza", list(RAZAS.keys()))
+            peso_act = col_reg3.number_input("Peso (kg)", min_value=0.0)
+            f_vacuna = col_reg4.date_input("Fecha Vacuna", datetime.now())
+            if st.form_submit_button("Guardar"):
+                if diio:
+                    st.session_state.historial_diio.append({
+                        "Fecha Registro": datetime.now().strftime("%d/%m/%Y"),
+                        "DIIO": diio, "Raza": raza_reg, "Peso (kg)": peso_act, "Última Vacuna": f_vacuna.strftime("%d/%m/%Y")
+                    })
+                    st.success("Registrado con éxito")
+
+# --- PANTALLA C: HISTORIAL COMPLETO ---
+elif st.session_state.pantalla == "historial_completo":
+    st.header("📂 Historial Acumulado de Gestión")
+    if st.button("⬅️ VOLVER AL INICIO"):
+        st.session_state.pantalla = "inicio"
+        st.rerun()
+    
+    st.markdown("---")
+    if st.session_state.historial_diio:
         df_hist = pd.DataFrame(st.session_state.historial_diio)
         st.dataframe(df_hist, use_container_width=True)
         
-        col_btn1, col_btn2 = st.columns(2)
-        with col_btn1:
-            st.download_button("📥 Descargar Base DIIO (Excel)", data=to_excel(df_hist), file_name="Inventario_DIIO.xlsx")
-        with col_btn2:
-            if st.button("Limpiar Historial de Sesión"):
-                st.session_state.historial_diio = []
-                st.rerun()
+        c_h1, c_h2 = st.columns(2)
+        c_h1.download_button("📥 DESCARGAR HISTORIAL EXCEL", data=to_excel(df_hist), file_name="Historial_DIIO.xlsx")
+        if c_h2.button("🗑️ LIMPIAR TODO EL HISTORIAL"):
+            st.session_state.historial_diio = []
+            st.rerun()
     else:
         st.info("No hay registros guardados en esta sesión.")
